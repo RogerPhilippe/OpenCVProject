@@ -1,7 +1,9 @@
 #include <jni.h>
 #include <string>
 #include <android/bitmap.h>
+#include <android/log.h>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/stitching.hpp>
 #include "opencv-utils.h"
 
 void bitmapToMat(JNIEnv *env, jobject bitmap, Mat& dst, jboolean needUnPremultiplyAlpha) {
@@ -91,6 +93,12 @@ void matToBitmap(JNIEnv* env, Mat src, jobject bitmap, jboolean needPremultiplyA
     }
 }
 
+std::string doubleToString(double value) {
+    std::ostringstream stream;
+    stream << value;
+    return stream.str();
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_br_com_mc1_opencvproject_MainActivity_stringFromJNI(
         JNIEnv* env,
@@ -122,4 +130,76 @@ Java_br_com_mc1_opencvproject_MainActivity_myBlurJNI(
     bitmapToMat(env, bitmapIn, src, false);
     myBlur(src, sigma);
     matToBitmap(env, src, bitmapOut, false);
+}
+
+extern "C" JNIEXPORT void JNICALL
+        Java_br_com_mc1_opencvproject_MainActivity_stitchImagesJNI(
+                JNIEnv* env,
+                jobject,
+                jobjectArray bitmapsIn,
+                jobjectArray bitmapsOut) {
+
+
+    std::vector<cv::Mat> matricesIn;
+    std::vector<cv::Mat> matricesOut;
+    int length = env->GetArrayLength(bitmapsIn);
+    for (int i = 0; i < length; i++) {
+        jobject bitmapIn = env->GetObjectArrayElement(bitmapsIn, i);
+        Mat src;
+        bitmapToMat(env, bitmapIn, src, false);
+        matricesIn.push_back(src);
+        env->DeleteLocalRef(bitmapIn);
+    }
+
+    Stitcher stitcher = Stitcher();
+    stitcher.stitch(matricesIn, matricesOut);
+
+    int index = 0;
+    for(const Mat& matrix : matricesOut) {
+
+        jclass bitmapConfigClass = env->FindClass("android/graphics/Bitmap$Config");
+        jfieldID defaultBitmapConfigField = env->GetStaticFieldID(bitmapConfigClass, "ARGB_8888", "Landroid/graphics/Bitmap$Config;");
+        jobject defaultBitmapConfig = env->GetStaticObjectField(bitmapConfigClass, defaultBitmapConfigField);
+
+        jclass bitmapClass = env->FindClass("android/graphics/Bitmap");
+        jmethodID createBitmapMethod = env->GetStaticMethodID(bitmapClass, "createBitmap", "(IILandroid/graphics/Bitmap$Config;)Landroid/graphics/Bitmap;");
+        jobject out = env->CallStaticObjectMethod(bitmapClass, createBitmapMethod, matrix.cols, matrix.rows, defaultBitmapConfig);
+
+        matToBitmap(env, matrix, out, false);
+        env->SetObjectArrayElement(bitmapsOut, index, out);
+        index++;
+
+    }
+
+}
+
+extern "C" JNIEXPORT jboolean JNICALL
+Java_br_com_mc1_opencvproject_MainActivity_blurDetectJNI(
+        JNIEnv* env,
+        jobject,
+        jobject bitmapIn,
+        jdouble threshold) {
+
+    Mat src;
+    Mat gray;
+
+    bitmapToMat(env, bitmapIn, src, false);
+
+    // Converta a imagem para escala de cinza
+    cv::cvtColor(src,gray,cv::COLOR_BGR2GRAY);
+
+    // Calcule o operador Laplaciano
+    cv::Mat laplacian;
+    cv::Laplacian(gray, laplacian, CV_64F);
+
+    // Calcule a variância do Laplaciano
+    cv::Scalar mean, stddev;
+    cv::meanStdDev(laplacian, mean, stddev);
+
+    double variance = stddev.val[0] * stddev.val[0];
+    std::string result = std::string("variance: ") + std::string(doubleToString(variance));
+    __android_log_print(ANDROID_LOG_DEBUG, "blurDetectJNI", "%s", result.c_str());
+
+    if (variance < threshold) return JNI_TRUE; else return JNI_FALSE;
+
 }

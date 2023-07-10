@@ -39,6 +39,8 @@ android {
     buildFeatures {
         viewBinding true
     }
+
+    /** To separate APK for witch architecture
     splits {
         abi {
             enable true
@@ -46,6 +48,8 @@ android {
             include 'x86', 'x86_64', 'arm64-v8a', 'armeabi-v7a'
         }
     }
+   */
+
 }
 
 dependencies {

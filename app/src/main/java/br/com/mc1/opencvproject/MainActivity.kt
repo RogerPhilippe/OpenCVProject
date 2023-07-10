@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.view.View
 import android.widget.SeekBar
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import br.com.mc1.opencvproject.databinding.ActivityMainBinding
 import java.lang.Float.max
@@ -40,6 +41,9 @@ class MainActivity : AppCompatActivity(), SeekBar.OnSeekBarChangeListener {
 
         // This is the actual call to the blur method inside native-lib.cpp
         this.myBlurJNI(srcBitmap!!, dstBitmap!!, sigma)
+
+        val isBlurred = this.blurDetectJNI(dstBitmap!!, 10.0)
+        Toast.makeText(this, "IsBlurred? $isBlurred", Toast.LENGTH_SHORT).show()
     }
 
     override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
@@ -64,6 +68,9 @@ class MainActivity : AppCompatActivity(), SeekBar.OnSeekBarChangeListener {
     external fun stringFromJNI(): String
     private external fun myFlipJNI(bitmamIn: Bitmap, bitmapOut: Bitmap)
     private external fun myBlurJNI(bitmamIn: Bitmap, bitmapOut: Bitmap, sigma: Float)
+    private external fun stitchImagesJNI(bitmapsIn: Array<Bitmap>, bitmapsOut: Array<Bitmap>)
+
+    private external fun blurDetectJNI(bitmamIn: Bitmap, threshold: Double): Boolean
 
     companion object {
 
